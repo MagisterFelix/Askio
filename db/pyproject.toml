@@ -1,0 +1,12 @@
+[project]
+name = "db"
+version = "0.1.0"
+description = "The DB provides the asynchronous data layer for the system."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "asyncpg>=0.30.0",
+    "faststream[rabbit]>=0.5.48",
+    "pydantic-settings>=2.10.1",
+    "sqlalchemy[asyncio]>=2.0.42",
+]
