@@ -1,0 +1,11 @@
+[project]
+name = "api"
+version = "0.1.0"
+description = "The API exposes a public-facing asynchronous HTTP API."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard]>=0.116.1",
+    "faststream[rabbit]>=0.5.48",
+    "pydantic-settings>=2.10.1",
+]

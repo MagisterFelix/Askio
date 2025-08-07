@@ -1,0 +1,135 @@
+services:
+  rabbitmq:
+    image: rabbitmq:latest
+    container_name: rabbitmq
+    env_file:
+      - .env
+    hostname: ${RABBITMQ_HOST}
+    ports:
+      - '${RABBITMQ_PORT}:${RABBITMQ_PORT}'
+    volumes:
+      - mq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', 'check_port_connectivity']
+      interval: 15s
+      timeout: 30s
+      retries: 10
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    env_file:
+      - .env
+    hostname: ${OLLAMA_HOST}
+    ports:
+      - '${OLLAMA_PORT}:${OLLAMA_PORT}'
+    volumes:
+      - ai_data:/root/.ollama
+    entrypoint: [
+      "/bin/bash", "-c", "\
+      ollama serve & \
+      sleep 5 && \
+      ollama pull ${OLLAMA_MODEL} && \
+      wait"
+    ]
+    healthcheck:
+      test: [
+        "CMD", "bash", "-c",
+        "(ollama --version && ollama list | grep -q ${OLLAMA_MODEL}) || exit 1"
+      ]
+      interval: 15s
+      timeout: 30s
+      retries: 10
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    env_file:
+      - .env
+    hostname: ${POSTGRES_HOST}
+    ports:
+      - '${POSTGRES_PORT}:${POSTGRES_PORT}'
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD', 'pg_isready', '-U', '${POSTGRES_USER}', '-d', '${POSTGRES_DB}']
+      interval: 15s
+      timeout: 30s
+      retries: 10
+    restart: unless-stopped
+
+  chat:
+    build:
+      context: ./chat
+      dockerfile: Dockerfile
+    image: chat:latest
+    container_name: chat
+    env_file:
+      - .env
+    hostname: ${CHAT_NAME}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    build:
+      context: ./db
+      dockerfile: Dockerfile
+    image: db:latest
+    container_name: db
+    env_file:
+      - .env
+    hostname: ${DB_NAME}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    image: api:latest
+    container_name: api
+    env_file:
+      - .env
+    hostname: ${API_NAME}
+    ports:
+      - '${API_PORT}:${API_PORT}'
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      chat:
+        condition: service_started
+      db:
+        condition: service_started
+    restart: unless-stopped
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    image: client:latest
+    container_name: client
+    env_file:
+      - .env
+    hostname: ${CLIENT_NAME}
+    ports:
+      - '${CLIENT_PORT}:${CLIENT_PORT}'
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  mq_data:
+  ai_data:
+  pg_data:
